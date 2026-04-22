@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="container py-4">
+
+    <h4 class="mb-3">Visitor Dashboard</h4>
+
+    <a href="/export-today" class="btn btn-primary mb-3 w-100">
+    Download Today's Report
+    </a>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>SN</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Whom To See</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for v in visitors %}
+                <tr>
+                    <td>{{ v.sn }}</td>
+                    <td>{{ v.visitor_name }}</td>
+                    <td>{{ v.phone_no }}</td>
+                    <td>{{ v.whom_to_see }}</td>
+                    <td>{{ v.time_in }}</td>
+                    <td>{{ v.time_out }}</td>
+                    <td>
+                        {% if not v.time_out %}
+                            <a href="/timeout/{{ v.id }}" class="btn btn-sm btn-danger">
+                                Sign Out
+                            </a>
+                        {% else %}
+                            Done
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+{% endblock %}

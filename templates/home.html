@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="header">
+    <img src="{{ url_for('static', filename='logo.jpg') }}" class="logo-img mb-2">
+    <h3>SUNFLAG NIG LTD</h3>
+    <p class="mb-0">Visitor Registration System</p>
+</div>
+
+<div class="container py-4">
+
+    <div class="card main-card shadow p-4 text-center">
+
+        <h5 class="mb-3">Scan QR Code To Register</h5>
+
+        <img src="{{ url_for('static', filename='qr.png') }}" class="qr-img mb-3">
+
+        <a href="/dashboard" class="btn btn-dark w-100">
+            Admin Dashboard
+        </a>
+
+    </div>
+
+</div>
+
+{% endblock %}
