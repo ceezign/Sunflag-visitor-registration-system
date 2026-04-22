@@ -24,7 +24,7 @@ def get_nigeria_time():
 # ----------------------------
 def get_db_connection():
     return psycopg2.connect(
-        os.environ.get("postgresql://sunflag_visitor_user:48p3fqYm3SG3Ko21s8kOeiFSR0MGC76x@dpg-d7kesd67r5hc738a2oug-a.frankfurt-postgres.render.com/sunflag_visitor"),
+        os.environ.get("DATABASE_URL"),
         cursor_factory=RealDictCursor
     )
 
