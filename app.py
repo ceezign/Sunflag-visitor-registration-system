@@ -1,46 +1,59 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
-import sqlite3
-from datetime import datetime
-import qrcode
 import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import qrcode
 from openpyxl import Workbook
+from datetime import datetime
+import pytz
 
 app = Flask(__name__)
-app.secret_key = "sunflag_secret_key"
-
-DATABASE = "visitors.db"
+app.secret_key = os.environ.get("SECRET_KEY", "fallback-secret")
 
 
 # ----------------------------
-# Database Connection
+# Nigeria Time
+# ----------------------------
+def get_nigeria_time():
+    lagos = pytz.timezone("Africa/Lagos")
+    return datetime.now(lagos)
+
+
+# ----------------------------
+# Database Connection (Postgres)
 # ----------------------------
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg2.connect(
+        os.environ.get("postgresql://sunflag_visitor_user:48p3fqYm3SG3Ko21s8kOeiFSR0MGC76x@dpg-d7kesd67r5hc738a2oug-a.frankfurt-postgres.render.com/sunflag_visitor"),
+        cursor_factory=RealDictCursor
+    )
 
 
 # ----------------------------
-# Create Table If Not Exists
+# Create Table
 # ----------------------------
 def init_db():
     conn = get_db_connection()
-    conn.execute("""
+    cur = conn.cursor()
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS visitors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             sn INTEGER,
-            visitor_name TEXT NOT NULL,
+            visitor_name TEXT,
             full_address TEXT,
             tag_no TEXT,
             phone_no TEXT,
             whom_to_see TEXT,
             purpose TEXT,
-            time_in TEXT,
-            time_out TEXT,
+            time_in TIMESTAMP,
+            time_out TIMESTAMP,
             acknowledged INTEGER
         )
     """)
+
     conn.commit()
+    cur.close()
     conn.close()
 
 
@@ -48,33 +61,30 @@ init_db()
 
 
 # ----------------------------
-# Generate QR Code Automatically
+# Generate QR Code
 # ----------------------------
-
-
 def generate_qr():
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "http://127.0.0.1:5000")
+
     qr = qrcode.make(f"{base_url}/register")
-    qr.save("static/qr.png")
+
     if not os.path.exists("static"):
         os.makedirs("static")
 
     qr.save("static/qr.png")
 
+
 generate_qr()
 
 
 # ----------------------------
-# Home Page
+# Routes
 # ----------------------------
 @app.route("/")
 def home():
     return render_template("home.html")
 
 
-# ----------------------------
-# Registration Page
-# ----------------------------
 @app.route("/register")
 def register():
     return render_template("register.html")
@@ -86,16 +96,16 @@ def add_visitor():
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM visitors")
-    sn = cur.fetchone()[0] + 1
+    sn = cur.fetchone()['count'] + 1
 
     acknowledged = 1 if request.form.get("acknowledged") else 0
 
-    time_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    time_in = get_nigeria_time()
 
     cur.execute("""
         INSERT INTO visitors 
         (sn, visitor_name, full_address, tag_no, phone_no, whom_to_see, purpose, time_in, acknowledged)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         sn,
         request.form["visitor_name"],
@@ -109,45 +119,64 @@ def add_visitor():
     ))
 
     conn.commit()
+    cur.close()
     conn.close()
 
     flash("Thank you. Your visit has been successfully registered.")
     return redirect(url_for("register"))
 
 
-# ----------------------------
-# Dashboard
-# ----------------------------
 @app.route("/dashboard")
 def dashboard():
     conn = get_db_connection()
-    visitors = conn.execute("SELECT * FROM visitors").fetchall()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM visitors ORDER BY id DESC")
+    visitors = cur.fetchall()
+
+    cur.close()
     conn.close()
+
     return render_template("dashboard.html", visitors=visitors)
 
 
 @app.route("/timeout/<int:id>")
 def timeout(id):
     conn = get_db_connection()
-    time_out = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn.execute("UPDATE visitors SET time_out = ? WHERE id = ?", (time_out, id))
+    cur = conn.cursor()
+
+    time_out = get_nigeria_time()
+
+    cur.execute(
+        "UPDATE visitors SET time_out = %s WHERE id = %s",
+        (time_out, id)
+    )
+
     conn.commit()
+    cur.close()
     conn.close()
+
     return redirect(url_for("dashboard"))
 
 
 # ----------------------------
-# Export Today's Visitors To Excel
+# Export Excel (Today)
 # ----------------------------
 @app.route("/export-today")
 def export_today():
     conn = get_db_connection()
-    today = datetime.now().strftime("%Y-%m-%d")
+    cur = conn.cursor()
 
-    visitors = conn.execute(
-        "SELECT * FROM visitors WHERE date(time_in) = ?", (today,)
-    ).fetchall()
+    today = get_nigeria_time().date()
 
+    cur.execute("""
+        SELECT * FROM visitors 
+        WHERE DATE(time_in) = %s
+    """, (today,))
+
+    visitors = cur.fetchall()
+
+    cur.close()
     conn.close()
 
     wb = Workbook()
@@ -155,9 +184,8 @@ def export_today():
     ws.title = "Daily Report"
 
     headers = [
-        "SN", "Visitor Name", "Address", "Tag No",
-        "Phone", "Whom To See", "Purpose",
-        "Time In", "Time Out", "Acknowledged"
+        "SN", "Name", "Phone", "Whom To See",
+        "Purpose", "Time In", "Time Out"
     ]
 
     ws.append(headers)
@@ -166,21 +194,22 @@ def export_today():
         ws.append([
             v["sn"],
             v["visitor_name"],
-            v["full_address"],
-            v["tag_no"],
             v["phone_no"],
             v["whom_to_see"],
             v["purpose"],
-            v["time_in"],
-            v["time_out"],
-            "Yes" if v["acknowledged"] else "No"
+            str(v["time_in"]),
+            str(v["time_out"])
         ])
 
-        filename = f"sunflag_daily_report_{today}.xlsx"
-        wb.save(filename)
+    filename = "daily_report.xlsx"
+    wb.save(filename)
 
-        return send_file(filename, as_attachment=True)
+    return send_file(filename, as_attachment=True)
 
+
+# ----------------------------
+# Run App
+# ----------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port)
