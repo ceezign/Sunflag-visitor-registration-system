@@ -24,10 +24,10 @@ def get_nigeria_time():
 # ----------------------------
 def get_db_connection():
     return psycopg2.connect(
-        os.environ.get("DATABASE_URL"),
+        os.environ["DATABASE_URL"],
+        sslmode="require",
         cursor_factory=RealDictCursor
     )
-
 
 # ----------------------------
 # Create Table
@@ -57,14 +57,21 @@ def init_db():
     conn.close()
 
 
-init_db()
+try:
+    init_db()
+    print("Database successful")
+except Exception as e:
+    print(f"Database Error: {e}")
+
 
 
 # ----------------------------
 # Generate QR Code
 # ----------------------------
 def generate_qr():
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", "http://127.0.0.1:5000")
+    base_url = os.environ.get(
+        "BASE_URL", "http://127.0.0.1:5000"
+    )
 
     qr = qrcode.make(f"{base_url}/register")
 
