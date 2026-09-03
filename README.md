@@ -32,15 +32,16 @@ This application allows visitors to register via QR code, while securely storing
  • 📱 Progressive Web App (PWA) support
  • ☁️ Cloud database integration
 
-🔗 Project live on Render: [https://sunflag-visitor-registration-system.onrender.com/](#)
+🔗 Project live on Render: [Visitor Registration System](https://sunflag-visitor-registration-system.onrender.com/)
 
 ⸻
 👨‍💻 Author
 
 Atunde Toheeb Ayomide
+ • 📧 [atundetoheeb1@gmail.com](mailto:atundetoheeb1@gmail.com)  
  • GitHub: https://github.com/ceezign
  • LinkedIn: https://www.linkedin.com/in/atunde-toheeb-551826313
-
+ • 💼 [Website](https://atunde-portfolio-web.vercel.app/)
 ⸻
 📄 License
 
